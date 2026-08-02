@@ -1,0 +1,32 @@
+{
+  "Core.lua": {
+    "mtime": 1785685173.4573965,
+    "ast_hash": "39bdde9cbe90141c17ba99056a541d9b",
+    "semantic_hash": "39bdde9cbe90141c17ba99056a541d9b"
+  },
+  "ElvUI_to_EllesmeresUI.toc": {
+    "mtime": 1785672633.4888606,
+    "ast_hash": "fe1fbea4c12c35f5421176ce7d33edaa",
+    "semantic_hash": "fe1fbea4c12c35f5421176ce7d33edaa"
+  },
+  "Migration.lua": {
+    "mtime": 1785686148.6533036,
+    "ast_hash": "712e892673d015dd47a7f85e46197652",
+    "semantic_hash": "712e892673d015dd47a7f85e46197652"
+  },
+  "UI.lua": {
+    "mtime": 1785686110.3402762,
+    "ast_hash": "bc80d5a5cdc4c34f1ea69ffd53946d77",
+    "semantic_hash": "bc80d5a5cdc4c34f1ea69ffd53946d77"
+  },
+  "tests/addon_load_spec.lua": {
+    "mtime": 1785686089.3451738,
+    "ast_hash": "58c8b78cebe9c32cf6101b9cf5b134fa",
+    "semantic_hash": "58c8b78cebe9c32cf6101b9cf5b134fa"
+  },
+  "tests/migration_spec.lua": {
+    "mtime": 1785686038.327274,
+    "ast_hash": "e1fbddb83d0878dbaaddd5413e2d4141",
+    "semantic_hash": "e1fbddb83d0878dbaaddd5413e2d4141"
+  }
+}

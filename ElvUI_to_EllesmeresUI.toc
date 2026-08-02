@@ -1,0 +1,15 @@
+## Interface: 120000, 120001, 120005, 120007, 120100
+## Title: |cff1784d1ElvUI|r to |cff0cd29fEllesmereUI|r
+## Notes: Creates an EllesmereUI profile from the active ElvUI profile.
+## Author: Migration Tool
+## Version: 1.0.0
+## Dependencies: EllesmereUI
+## OptionalDeps: ElvUI, EllesmereUIUnitFrames, EllesmereUIRaidFrames, EllesmereUIActionBars, EllesmereUIMinimap
+## SavedVariables: ElvUIToEllesmereDB
+## IconTexture: Interface\AddOns\EllesmereUI\media\eg-logo.tga
+## AddonCompartmentFunc: ElvUIToEllesmere_Open
+## Category: User Interface
+
+Migration.lua
+UI.lua
+Core.lua

@@ -1,0 +1,12 @@
+# Generated or repository-management content
+.git/
+.github/
+graphify-out/
+.release/
+
+# Local and packaged artifacts
+*.zip
+*.luac
+*.out
+.DS_Store
+Thumbs.db

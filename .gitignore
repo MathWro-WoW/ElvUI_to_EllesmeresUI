@@ -1,0 +1,23 @@
+# Operating system and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Lua build and coverage output
+*.luac
+*.out
+luacov.stats.out
+luacov.report.out
+
+# Release packaging output
+.release/
+*.zip
+
+# Graphify transient state; final graph/report/HTML remain tracked
+graphify-out/.graphify_*
+graphify-out/cache/
+graphify-out/memory/
+graphify-out/reflections/
