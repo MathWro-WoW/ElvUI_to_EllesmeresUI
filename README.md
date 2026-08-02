@@ -73,4 +73,13 @@ graphify extract . --code-only
 
 ## Releases
 
-Version tags trigger the GitHub Actions release workflow. The workflow uses the BigWigsMods packager to create a correctly nested addon archive and publish it as a GitHub release.
+Push an annotated `v*` tag to package the addon and publish a GitHub release:
+
+```sh
+git tag -a v1.0.0 -m "v1.0.0"
+git push origin v1.0.0
+```
+
+The workflow can also be started manually for an existing tag from the GitHub Actions page. It uses the BigWigsMods packager to create an archive rooted at `ElvUI_to_EllesmeresUI/`.
+
+CurseForge publishing is intentionally disabled. The commented configuration in `.pkgmeta` and `.github/workflows/release.yml` documents the project ID and secret changes required to enable it later.

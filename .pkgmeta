@@ -1,0 +1,15 @@
+package-as: ElvUI_to_EllesmeresUI
+
+# CurseForge publishing is intentionally disabled for the initial releases.
+# To enable it later, replace the placeholder below with the CurseForge project ID,
+# uncomment it, and enable CF_API_KEY in .github/workflows/release.yml.
+# curse-id: REPLACE_WITH_CURSEFORGE_PROJECT_ID
+
+ignore:
+  - .pkgmeta
+  - .github
+  - .gitignore
+  - .graphifyignore
+  - AGENTS.md
+  - graphify-out
+  - tests
