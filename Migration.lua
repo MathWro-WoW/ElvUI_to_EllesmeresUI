@@ -10,7 +10,7 @@ ns.Components = {
     { key = "otherUnits", label = "Other unit frames", description = "Focus, pet, target-of-target, focus-target, and boss frames" },
     { key = "party", label = "Party frames", description = "Size, position, growth, sorting, power, text, and debuffs" },
     { key = "raid", label = "Raid frames", description = "Size tiers, position, groups, growth, power, text, and debuffs" },
-    { key = "actionBars", label = "Action bars", description = "Supported bar pages, layout, size, text, visibility, and position" },
+    { key = "actionBars", label = "Action bars", description = "Bars and utility menus: layout, text, direct visibility modes, and position" },
     { key = "minimap", label = "Minimap", description = "Shape, size, rotation, text scale, buttons, and position" },
 }
 
@@ -452,13 +452,266 @@ local BAR_MAP = {
     bar15 = { target = "Bar8", mover = "ElvAB_15" },
 }
 
-local function barVisibility(src)
-    if src.enabled == false then return "never" end
-    local value = tostring(src.visibility or ""):lower():gsub("%s+", " ")
-    if value == "hide" then return "never" end
-    if value:find("%[combat%]%s*show") and value:match("hide%s*$") then return "in_combat" end
-    if value:find("%[nocombat%]%s*show") and value:match("hide%s*$") then return "out_of_combat" end
+local VISIBILITY_MODE_ORDER = {
+    "in_combat", "out_of_combat", "in_raid", "in_party", "solo",
+    "show_dragonriding", "show_not_dragonriding",
+}
+
+local REGULAR_BAR_INTRINSIC_HIDES = { vehicleui = true, petbattle = true, overridebar = true }
+local MAIN_BAR_INTRINSIC_HIDES = { petbattle = true }
+local STANCE_BAR_INTRINSIC_HIDES = { vehicleui = true, petbattle = true }
+local PET_BAR_INTRINSIC_HIDES = {
+    vehicleui = true, petbattle = true, overridebar = true, possessbar = true,
+}
+local UTILITY_BAR_INTRINSIC_HIDES = { petbattle = true }
+
+local HIDE_OPTION_KEYS = {
+    mounted = "visHideMounted",
+    noexists = "visHideNoTarget",
+    noharm = "visHideNoEnemy",
+}
+
+local function visibilityGroups(prefix)
+    if prefix == "" then return {} end
+    local groups = {}
+    for group in prefix:gmatch("%[([^%]]+)%]") do groups[#groups + 1] = group end
+    if #groups == 0 or prefix:gsub("%[[^%]]+%]", "") ~= "" then return nil end
+    return groups
+end
+
+local function visibilityTerms(group)
+    local terms = {}
+    for term in group:gmatch("([^,]+)") do terms[#terms + 1] = term end
+    return terms
+end
+
+local function parseVisibilityClause(value)
+    local action
+    if value:sub(-4) == "show" then action = "show"
+    elseif value:sub(-4) == "hide" then action = "hide"
+    else return nil end
+    local prefix = value:sub(1, #value - 4)
+    local groups = visibilityGroups(prefix)
+    if not groups then return nil end
+    return { action = action, groups = groups }
+end
+
+local function groupsContainOnly(groups, allowed)
+    if #groups == 0 then return false end
+    for _, group in ipairs(groups) do
+        local terms = visibilityTerms(group)
+        if #terms ~= 1 or not allowed[terms[1]] then return false end
+    end
+    return true
+end
+
+local function collectHideOptions(groups, result)
+    if #groups == 0 then return false end
+    for _, group in ipairs(groups) do
+        local terms = visibilityTerms(group)
+        local key = #terms == 1 and HIDE_OPTION_KEYS[terms[1]]
+        if not key then return false end
+        result[key] = true
+    end
+    return true
+end
+
+local function parseVisibilityModes(groups, intrinsicPet)
+    if #groups ~= 1 then return nil end
+    local terms = visibilityTerms(groups[1])
+    local modes = {}
+    local sawAdvFlyable, sawFlying, sawAnyGroup, sawExplicitParty, sawExplicitRaid
+    local intrinsicPetTerms = {
+        pet = true, novehicleui = true, nopetbattle = true,
+        nooverridebar = true, nopossessbar = true,
+    }
+    local onlyIntrinsicPet = intrinsicPet and #terms > 0
+
+    for _, term in ipairs(terms) do
+        if not intrinsicPetTerms[term] then onlyIntrinsicPet = false end
+        if term == "combat" then
+            if modes.out_of_combat then return nil end
+            modes.in_combat = true
+        elseif term == "nocombat" then
+            if modes.in_combat then return nil end
+            modes.out_of_combat = true
+        elseif term == "group:raid" then
+            if modes.solo or sawExplicitParty then return nil end
+            modes.in_raid, sawExplicitRaid = true, true
+        elseif term == "group:party" then
+            if modes.solo or sawExplicitRaid then return nil end
+            modes.in_party, sawExplicitParty = true, true
+        elseif term == "group" then
+            if modes.solo or sawExplicitParty or sawExplicitRaid then return nil end
+            modes.in_party, modes.in_raid, sawAnyGroup = true, true, true
+        elseif term == "nogroup" then
+            if modes.in_party or modes.in_raid then return nil end
+            modes.solo = true
+        elseif term == "nogroup:raid" and modes.in_party then
+            -- EllesmereUI's in_party mode already excludes raid groups.
+        elseif term == "advflyable" then
+            sawAdvFlyable = true
+        elseif term == "flying" then
+            sawFlying = true
+        elseif not intrinsicPetTerms[term] then
+            return nil
+        end
+    end
+
+    if onlyIntrinsicPet and intrinsicPet then return {}, true end
+    if sawAnyGroup and (sawExplicitParty or sawExplicitRaid) then return nil end
+    if sawAdvFlyable ~= sawFlying then return nil end
+    if sawAdvFlyable then modes.show_dragonriding = true end
+    if not next(modes) then return nil end
+    return modes, false
+end
+
+local function sameModes(left, right)
+    if not left or not right then return false end
+    for key, value in pairs(left) do if value ~= right[key] then return false end end
+    for key, value in pairs(right) do if value ~= left[key] then return false end end
+    return true
+end
+
+local function complementVisibilityModes(modes)
+    local count, only
+    for key in pairs(modes) do count, only = (count or 0) + 1, key end
+    if count == 1 then
+        local inverse = {
+            in_combat = "out_of_combat", out_of_combat = "in_combat",
+            in_raid = "solo_or_party", in_party = "solo_or_raid", solo = "group",
+            show_dragonriding = "show_not_dragonriding",
+        }
+        local value = inverse[only]
+        if value == "group" then return { in_party = true, in_raid = true } end
+        if value == "solo_or_party" then return { solo = true, in_party = true } end
+        if value == "solo_or_raid" then return { solo = true, in_raid = true } end
+        return value and { [value] = true } or nil
+    end
+    if count == 2 and modes.in_party and modes.in_raid then return { solo = true } end
+    return nil
+end
+
+local function visibilityRepresentative(modes)
+    if modes.mouseover then return "mouseover" end
+    for _, mode in ipairs(VISIBILITY_MODE_ORDER) do
+        if modes[mode] then return mode end
+    end
     return "always"
+end
+
+local function visibilityModeCount(modes)
+    local count = 0
+    for _ in pairs(modes) do count = count + 1 end
+    return count
+end
+
+local function visibilitySettings(src, intrinsicPet, intrinsicHides)
+    local result = {
+        mode = "always",
+        visHideMounted = false,
+        visHideNoTarget = false,
+        visHideNoEnemy = false,
+    }
+    if src.enabled == false then result.mode = "never"; return result end
+
+    local value = tostring(src.visibility or ""):lower():gsub("[%s\r\n]+", "")
+    local clauses = {}
+    if value ~= "" then
+        for text in value:gmatch("([^;]+)") do
+            local clause = parseVisibilityClause(text)
+            if not clause then result.unsupported = true; break end
+            if clause.action == "hide"
+                and groupsContainOnly(clause.groups, intrinsicHides or REGULAR_BAR_INTRINSIC_HIDES) then
+                -- The destination bar applies these guards intrinsically.
+            elseif clause.action == "hide" and collectHideOptions(clause.groups, result) then
+                -- These have direct EllesmereUI visibility-option flags.
+            else
+                clauses[#clauses + 1] = clause
+            end
+        end
+    end
+
+    local modes
+    if not result.unsupported and #clauses == 0 then
+        result.mode = "always"
+    elseif not result.unsupported and #clauses == 1 and #clauses[1].groups == 0 then
+        result.mode = clauses[1].action == "hide" and "never" or "always"
+    elseif not result.unsupported and #clauses == 2 then
+        local first, second = clauses[1], clauses[2]
+        if first.action == "show" and #second.groups == 0 and second.action == "hide" then
+            local intrinsic
+            modes, intrinsic = parseVisibilityModes(first.groups, intrinsicPet)
+            if intrinsic then result.mode = "always"
+            elseif not modes then result.unsupported = true end
+        elseif first.action == "hide" and #second.groups == 0 and second.action == "show" then
+            local hidden = parseVisibilityModes(first.groups, false)
+            modes = hidden and complementVisibilityModes(hidden)
+            if not modes then result.unsupported = true end
+        elseif first.action ~= second.action then
+            local showClause = first.action == "show" and first or second
+            local hideClause = first.action == "hide" and first or second
+            local shown = parseVisibilityModes(showClause.groups, intrinsicPet)
+            local hidden = parseVisibilityModes(hideClause.groups, false)
+            local inverse = hidden and complementVisibilityModes(hidden)
+            if shown and inverse and sameModes(shown, inverse) then modes = shown
+            else result.unsupported = true end
+        else
+            result.unsupported = true
+        end
+    elseif not result.unsupported then
+        result.unsupported = true
+    end
+
+    if result.unsupported then
+        modes = nil
+        result.mode = "always"
+    elseif modes and next(modes) then
+        result.mode = visibilityRepresentative(modes)
+    end
+
+    if src.mouseover == true and result.mode ~= "never" then
+        if result.mode == "always" and not modes then
+            result.mode = "mouseover"
+        else
+            modes = modes or { [result.mode] = true }
+            modes.mouseover = true
+            result.mode = visibilityRepresentative(modes)
+        end
+    end
+    if modes and visibilityModeCount(modes) > 1 then result.modes = modes end
+    return result
+end
+
+local function barVisibility(src)
+    return visibilitySettings(src, false).mode
+end
+
+local function applyBarVisibility(ctx, dst, src, label, intrinsicPet, intrinsicHides)
+    local visibility = visibilitySettings(src, intrinsicPet, intrinsicHides)
+    local mouseover = visibility.mode == "mouseover"
+        or (visibility.modes and visibility.modes.mouseover) or false
+
+    dst.visibilityModes = nil
+    dst._savedBarAlpha = nil
+    set(ctx, dst, "barVisibility", visibility.mode)
+    set(ctx, dst, "alwaysHidden", visibility.mode == "never")
+    set(ctx, dst, "mouseoverEnabled", mouseover)
+    set(ctx, dst, "mouseoverAlpha", mouseover and 0 or 1)
+    if mouseover then set(ctx, dst, "_savedBarAlpha", tonumber(src.alpha) or 1) end
+    set(ctx, dst, "combatShowEnabled", visibility.mode == "in_combat"
+        or (visibility.modes and visibility.modes.in_combat) or false)
+    set(ctx, dst, "combatHideEnabled", visibility.mode == "out_of_combat"
+        or (visibility.modes and visibility.modes.out_of_combat) or false)
+    set(ctx, dst, "visHideMounted", visibility.visHideMounted)
+    set(ctx, dst, "visHideNoTarget", visibility.visHideNoTarget)
+    set(ctx, dst, "visHideNoEnemy", visibility.visHideNoEnemy)
+    if visibility.modes then set(ctx, dst, "visibilityModes", visibility.modes) end
+
+    if visibility.unsupported then
+        addWarning(ctx, label .. " uses an ElvUI visibility condition without a direct EllesmereUI equivalent; it was migrated as "
+            .. (mouseover and "Mouseover." or "Always shown."))
+    end
 end
 
 local function migrateBar(ctx, sourceKey, map)
@@ -469,10 +722,11 @@ local function migrateBar(ctx, sourceKey, map)
     local dst = ensure(ensure(profile, "bars"), map.target)
     local enabled = src.enabled ~= false
     set(ctx, dst, "enabled", enabled)
-    set(ctx, dst, "alwaysHidden", not enabled)
-    set(ctx, dst, "barVisibility", barVisibility(src))
-    set(ctx, dst, "mouseoverEnabled", src.mouseover == true)
-    set(ctx, dst, "mouseoverAlpha", src.mouseover and (tonumber(src.alpha) or 1) or 1)
+    local intrinsicHides = REGULAR_BAR_INTRINSIC_HIDES
+    if map.target == "MainBar" then intrinsicHides = MAIN_BAR_INTRINSIC_HIDES
+    elseif map.target == "StanceBar" then intrinsicHides = STANCE_BAR_INTRINSIC_HIDES
+    elseif map.target == "PetBar" then intrinsicHides = PET_BAR_INTRINSIC_HIDES end
+    applyBarVisibility(ctx, dst, src, map.label or ("ElvUI " .. sourceKey), sourceKey == "barPet", intrinsicHides)
     set(ctx, dst, "clickThrough", src.clickThrough == true)
 
     local buttons = max(1, tonumber(src.buttons) or 12)
@@ -518,9 +772,18 @@ local function migrateActionBars(ctx)
     if #unsupported > 0 then
         addWarning(ctx, table.concat(unsupported, ", ") .. " use action pages that EllesmereUI does not expose; those bars were not migrated.")
     end
-    migrateBar(ctx, "stanceBar", { target = "StanceBar", mover = "ShiftAB" })
-    migrateBar(ctx, "barPet", { target = "PetBar", mover = "PetAB" })
+    migrateBar(ctx, "stanceBar", { target = "StanceBar", mover = "ShiftAB", label = "ElvUI Stance Bar" })
+    migrateBar(ctx, "barPet", { target = "PetBar", mover = "PetAB", label = "ElvUI Pet Bar" })
     local dst = targetModule(ctx.work, "EllesmereUIActionBars")
+    if type(ab.microbar) == "table" then
+        local micro = ensure(ensure(dst, "bars"), "MicroBar")
+        applyBarVisibility(ctx, micro, ab.microbar, "ElvUI Micro Bar", false, UTILITY_BAR_INTRINSIC_HIDES)
+    end
+    local bagBar = ctx.source.bags and ctx.source.bags.bagBar
+    if type(bagBar) == "table" then
+        local bags = ensure(ensure(dst, "bars"), "BagBar")
+        applyBarVisibility(ctx, bags, bagBar, "ElvUI Bag Bar", false, UTILITY_BAR_INTRINSIC_HIDES)
+    end
     set(ctx, dst, "desaturateOnCooldown", ab.desaturateOnCooldown == true)
 end
 
@@ -711,5 +974,6 @@ ns._Test = {
     textureKey = textureKey,
     syncTable = syncTable,
     barVisibility = barVisibility,
+    visibilitySettings = visibilitySettings,
     growthPair = growthPair,
 }

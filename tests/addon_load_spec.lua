@@ -1,7 +1,13 @@
 local createdFrames = {}
 local methods = {}
+local backdropMethods = {
+    SetBackdrop = true,
+    SetBackdropColor = true,
+    SetBackdropBorderColor = true,
+}
 local objectMeta = {
-    __index = function(_, key)
+    __index = function(self, key)
+        if backdropMethods[key] and not rawget(self, "_hasBackdrop") then return nil end
         return methods[key] or function() end
     end,
 }
@@ -48,9 +54,10 @@ function methods:Raise() self._raised = true end
 
 UIParent = object(nil)
 UIParent:SetSize(1920, 1080)
-function CreateFrame(_, name, parent)
+function CreateFrame(_, name, parent, template)
     local frame = object(parent or UIParent)
     frame._name = name
+    frame._hasBackdrop = type(template) == "string" and template:find("BackdropTemplate", 1, true) ~= nil
     createdFrames[#createdFrames + 1] = frame
     if name then _G[name] = frame end
     return frame

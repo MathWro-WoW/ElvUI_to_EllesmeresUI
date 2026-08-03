@@ -2,6 +2,8 @@
 
 A one-time migration assistant for World of Warcraft: Midnight. It creates a new EllesmereUI profile from the active ElvUI profile while leaving the source profile unchanged.
 
+> **AI assistance disclosure:** AI-assisted coding was used to design and implement this addon. Its migration behavior is covered by automated Lua fixtures, but users should still review the generated EllesmereUI profile before relying on it.
+
 ## Requirements
 
 - World of Warcraft Retail / Midnight
@@ -41,10 +43,24 @@ The migration runs in stages and reports the active component, completed steps, 
 - Focus, pet, target-of-target, focus-target, and boss frames
 - Party frames
 - Raid frames and supported raid-size overrides
-- Action bars, stance bar, and pet bar
+- Action bars, stance bar, pet bar, micro menu, and bag bar visibility
 - Minimap
 
 Where the addons expose equivalent settings, the migrator copies dimensions, positions, growth directions, visibility, sorting, textures, fonts, colors, text, cast bars, portraits, auras, and related layout options.
+
+Direct action-bar visibility translations include Always, Mouseover, Never, In Combat, Out of Combat, Raid, Party, Solo, Dragonriding, and Not Dragonriding. Compatible combined conditions and the Hide While Mounted, Hide Without Target, and Hide Without Enemy options are also preserved. Each destination bar keeps its built-in pet-battle, vehicle, and override-bar guards; a source-only guard that the destination cannot express produces a migration warning.
+
+“Supported” means that the migrator copies the settings for which the two addons have a practical equivalent; it does not clone every setting in those ElvUI modules.
+
+## Not migrated or only partially mapped
+
+- ElvUI modules outside the list above are not migrated. This includes nameplates, bags, chat, data texts and data bars, skins, tooltips, standalone cooldown configuration, and other general ElvUI styling.
+- Custom unit-frame texts, tags, and complex text formats are not reproduced exactly. Only the supported text sizes, positions, and broad health-display modes are mapped.
+- Custom aura filters, priorities, blacklists, whitelists, and detailed indicator rules are not recreated. Basic buff/debuff visibility, count, size, position, and personal-debuff behavior are mapped where possible.
+- Heal-prediction, absorb, threat/glow, custom indicator, and other advanced unit-frame behaviors without a direct EllesmereUI equivalent are not copied.
+- ElvUI bars 7–9, which use action pages 7–9, are not migrated because EllesmereUI exposes no independent destination bars for those pages. Visibility expressions without a direct EllesmereUI equivalent, custom paging rules, action assignments, and keybindings are not copied; the migrator reports a warning when it must fall back from an unsupported visibility expression.
+- Minimap migration covers its basic size, shape, rotation, text scale, selected button visibility, and position. Other ElvUI minimap integrations and icon-placement rules are not copied.
+- A saved mover anchored relative to another ElvUI frame may not be convertible when its live position cannot be read. In that case, EllesmereUI keeps its existing position and the migrator reports a warning.
 
 ## Safety and limitations
 

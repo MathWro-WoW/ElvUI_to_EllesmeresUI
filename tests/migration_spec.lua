@@ -50,6 +50,60 @@ local function bar(enabled, buttons, perrow, size)
     }
 end
 
+local function expectVisibility(source, expectedMode, expectedModes, intrinsicPet, intrinsicHides)
+    local result = ns._Test.visibilitySettings(source, intrinsicPet, intrinsicHides)
+    assert(result.mode == expectedMode, result.mode .. " ~= " .. expectedMode)
+    if expectedModes then
+        assert(type(result.modes) == "table")
+        for key, expected in pairs(expectedModes) do assert(result.modes[key] == expected, key) end
+        for key in pairs(result.modes) do assert(expectedModes[key] == true, "unexpected mode " .. key) end
+    else
+        assert(result.modes == nil)
+    end
+    return result
+end
+
+expectVisibility({ enabled = true, visibility = "show" }, "always")
+expectVisibility({ enabled = false, visibility = "show", mouseover = true }, "never")
+expectVisibility({ enabled = true, visibility = "[petbattle] hide; show", mouseover = true }, "mouseover")
+local unsupportedMainGuard = expectVisibility(
+    { enabled = true, visibility = "[vehicleui] hide; show" },
+    "always",
+    nil,
+    false,
+    { petbattle = true }
+)
+assert(unsupportedMainGuard.unsupported == true)
+expectVisibility({ enabled = true, visibility = "[combat] show; hide" }, "in_combat")
+expectVisibility({ enabled = true, visibility = "[nocombat] show; hide" }, "out_of_combat")
+expectVisibility({ enabled = true, visibility = "[group:raid] show; hide" }, "in_raid")
+expectVisibility({ enabled = true, visibility = "[group:party,nogroup:raid] show; hide" }, "in_party")
+expectVisibility({ enabled = true, visibility = "[group] show; hide" }, "in_raid", { in_raid = true, in_party = true })
+expectVisibility({ enabled = true, visibility = "[nogroup] show; hide" }, "solo")
+expectVisibility({ enabled = true, visibility = "[advflyable,flying] show; hide" }, "show_dragonriding")
+expectVisibility({ enabled = true, visibility = "[advflyable,flying] hide; show" }, "show_not_dragonriding")
+expectVisibility(
+    { enabled = true, visibility = "[combat,group:party] show; hide", mouseover = true },
+    "mouseover",
+    { in_combat = true, in_party = true, mouseover = true }
+)
+local hideOptions = expectVisibility(
+    { enabled = true, visibility = "[mounted] hide; [noexists] hide; [noharm] hide; show" },
+    "always"
+)
+assert(hideOptions.visHideMounted and hideOptions.visHideNoTarget and hideOptions.visHideNoEnemy)
+local unsupportedVisibility = expectVisibility(
+    { enabled = true, visibility = "[mod:shift] show; hide" },
+    "always"
+)
+assert(unsupportedVisibility.unsupported == true)
+expectVisibility(
+    { enabled = true, visibility = "[petbattle] hide; [novehicleui,pet,nooverridebar,nopossessbar] show; hide" },
+    "always",
+    nil,
+    true
+)
+
 local sourceProfile = {
     general = {
         font = "Homespun", fontOutline = "MONOCHROMEOUTLINE",
@@ -79,6 +133,9 @@ local sourceProfile = {
         bar3 = bar(true, 12, 1, 28), bar6 = bar(false, 12, 12, 31),
         stanceBar = bar(true, 8, 8, 26), barPet = bar(true, 10, 10, 27),
     },
+    bags = {
+        bagBar = { mouseover = false, visibility = "[noexists] hide; show" },
+    },
     movers = {
         ElvUF_PlayerMover = "BOTTOM,ElvUIParent,BOTTOM,-330,140",
         ElvUF_TargetMover = "BOTTOM,ElvUIParent,BOTTOM,330,140",
@@ -96,6 +153,20 @@ local sourceProfile = {
         PetAB = "RIGHT,ElvUIParent,RIGHT,-20,0",
         MinimapMover = "TOPRIGHT,ElvUIParent,TOPRIGHT,-12,-12",
     },
+}
+sourceProfile.actionbar.bar1.visibility = "[petbattle] hide; show"
+
+sourceProfile.actionbar.bar1.mouseover = true
+sourceProfile.actionbar.bar1.alpha = 0.72
+sourceProfile.actionbar.bar2.visibility = "[combat] show; hide"
+sourceProfile.actionbar.bar3.visibility = "[group:raid] show; hide"
+sourceProfile.actionbar.stanceBar.visibility = "[mounted] hide; show"
+sourceProfile.actionbar.barPet.visibility = "[petbattle] hide; [novehicleui,pet,nooverridebar,nopossessbar] show; hide"
+sourceProfile.actionbar.microbar = {
+    enabled = true,
+    mouseover = true,
+    alpha = 0.6,
+    visibility = "[nocombat] show; hide",
 }
 
 ElvUI = {
@@ -176,6 +247,21 @@ assert(ab.bars.Bar9.overrideNumIcons == 10)
 assert(ab.bars.Bar9.overrideNumRows == 2)
 assert(ab.bars.Bar4.orientation == "vertical")
 assert(ab.bars.Bar2.alwaysHidden == true)
+assert(ab.bars.MainBar.barVisibility == "mouseover")
+assert(ab.bars.MainBar.mouseoverEnabled == true and ab.bars.MainBar.mouseoverAlpha == 0)
+assert(ab.bars.MainBar._savedBarAlpha == 0.72)
+assert(ab.bars.Bar9.barVisibility == "in_combat" and ab.bars.Bar9.combatShowEnabled == true)
+assert(ab.bars.Bar4.barVisibility == "in_raid")
+assert(ab.bars.Bar2.barVisibility == "never")
+assert(ab.bars.StanceBar.visHideMounted == true)
+assert(ab.bars.PetBar.barVisibility == "always")
+assert(ab.bars.MicroBar.barVisibility == "mouseover")
+assert(ab.bars.MicroBar.visibilityModes.out_of_combat == true)
+assert(ab.bars.MicroBar.visibilityModes.mouseover == true)
+assert(ab.bars.MicroBar.combatHideEnabled == true)
+assert(ab.bars.MicroBar._savedBarAlpha == 0.6)
+assert(ab.bars.BagBar.barVisibility == "always")
+assert(ab.bars.BagBar.visHideNoTarget == true)
 assert(ab.barPositions.MainBar.y == 180)
 assert(ab.desaturateOnCooldown == true)
 
@@ -190,6 +276,15 @@ local duplicate, duplicateError = ns.RunMigration("Imported Fixture", selected)
 assert(duplicate == false and duplicateError:find("already exists", 1, true))
 local empty, emptyError = ns.RunMigration("Empty Selection", {})
 assert(empty == false and emptyError:find("Select at least one", 1, true))
+
+local supportedVisibility = sourceProfile.actionbar.bar1.visibility
+sourceProfile.actionbar.bar1.visibility = "[mod:shift] show; hide"
+local fallbackOK, visibilityFallback = ns.RunMigration("Visibility Fallback", { actionBars = true })
+assert(fallbackOK)
+assert(#visibilityFallback.warnings == 1)
+assert(visibilityFallback.warnings[1]:find("without a direct EllesmereUI equivalent", 1, true))
+assert(EllesmereUIDB.profiles["Visibility Fallback"].addons.EllesmereUIActionBars.bars.MainBar.barVisibility == "mouseover")
+sourceProfile.actionbar.bar1.visibility = supportedVisibility
 
 local timerQueue = {}
 C_Timer = {

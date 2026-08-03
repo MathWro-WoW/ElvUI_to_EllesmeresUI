@@ -10,23 +10,23 @@
     "semantic_hash": "fe1fbea4c12c35f5421176ce7d33edaa"
   },
   "Migration.lua": {
-    "mtime": 1785686148.6533036,
-    "ast_hash": "712e892673d015dd47a7f85e46197652",
-    "semantic_hash": "712e892673d015dd47a7f85e46197652"
+    "mtime": 1785797330.0852273,
+    "ast_hash": "27464e78db2d1e5945fac22728883589",
+    "semantic_hash": "27464e78db2d1e5945fac22728883589"
   },
   "UI.lua": {
-    "mtime": 1785686110.3402762,
-    "ast_hash": "bc80d5a5cdc4c34f1ea69ffd53946d77",
-    "semantic_hash": "bc80d5a5cdc4c34f1ea69ffd53946d77"
+    "mtime": 1785710931.072778,
+    "ast_hash": "97560f732b6ca59553aa5199f2bfa546",
+    "semantic_hash": "97560f732b6ca59553aa5199f2bfa546"
   },
   "tests/addon_load_spec.lua": {
-    "mtime": 1785686089.3451738,
-    "ast_hash": "58c8b78cebe9c32cf6101b9cf5b134fa",
-    "semantic_hash": "58c8b78cebe9c32cf6101b9cf5b134fa"
+    "mtime": 1785710708.8171394,
+    "ast_hash": "e0d455617b7dbc779a37e7356c3f1f45",
+    "semantic_hash": "e0d455617b7dbc779a37e7356c3f1f45"
   },
   "tests/migration_spec.lua": {
-    "mtime": 1785686038.327274,
-    "ast_hash": "e1fbddb83d0878dbaaddd5413e2d4141",
-    "semantic_hash": "e1fbddb83d0878dbaaddd5413e2d4141"
+    "mtime": 1785797339.4599502,
+    "ast_hash": "3305d348385d2f332f5990707124aa91",
+    "semantic_hash": "3305d348385d2f332f5990707124aa91"
   }
 }
