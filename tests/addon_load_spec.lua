@@ -64,8 +64,9 @@ function CreateFrame(_, name, parent, template)
 end
 
 GameTooltip = object(UIParent)
+local disabledAddons = {}
 C_AddOns = {
-    DisableAddOn = function(name) _G.__disabledAddon = name end,
+    DisableAddOn = function(name) disabledAddons[name] = true end,
 }
 C_Timer = { After = function(_, callback) callback() end }
 SlashCmdList = {}
@@ -102,6 +103,7 @@ end
 assert(metadata.Interface:find("120000", 1, true))
 assert(metadata.Dependencies == "EllesmereUI")
 assert(metadata.OptionalDeps:find("ElvUI", 1, true))
+assert(metadata.OptionalDeps:find("EllesmereUIBlizzardSkin", 1, true))
 assert(metadata.SavedVariables == "ElvUIToEllesmereDB")
 assert(metadata.AddonCompartmentFunc == "ElvUIToEllesmere_Open")
 assert(table.concat(tocFiles, ",") == "Migration.lua,UI.lua,Core.lua")
@@ -127,6 +129,11 @@ assert(menu:IsShown())
 assert(menu._sourceValue:GetText() == "Load Smoke", menu._sourceValue:GetText())
 assert(menu._nameBox:GetText() == "ElvUI - Load Smoke")
 assert(menu._migrate._enabled == true)
+assert(#menu._checks == #ns.Components and #menu._checks == 9)
+assert(menu._checks[9]._component.key == "tooltips")
+assert(menu:GetHeight() == 732)
+assert(menu._disableCheck.checked == false)
+assert(menu._disableSelfCheck.checked == false)
 
 for _, check in ipairs(menu._checks) do check:SetCheckedVisual(false) end
 menu._checks[1]:SetCheckedVisual(true)
@@ -138,6 +145,7 @@ assert(menu._progress:IsShown())
 assert(menu._progressValue == 0 and menu._progressPercent:GetText() == "0%")
 assert(menu._migrate:IsEnabled() == false)
 assert(menu._checks[1]:IsEnabled() == false)
+assert(menu._disableSelfCheck:IsEnabled() == false)
 assert(#uiTimers == 1)
 
 table.remove(uiTimers, 1)()
@@ -149,7 +157,17 @@ assert(menu._progressValue == menu._progressTotal)
 assert(menu._progressPercent:GetText() == "100%")
 assert(menu._migrate:IsEnabled() == true)
 assert(menu._disableCheck:IsEnabled() == true)
+assert(menu._disableSelfCheck:IsEnabled() == true)
 assert(menu._checks[1]:IsEnabled() == false)
+
+menu._disableCheck:GetScript("OnClick")(menu._disableCheck)
+menu._disableSelfCheck:GetScript("OnClick")(menu._disableSelfCheck)
+assert(ElvUIToEllesmereDB.disableElvUI == true)
+assert(ElvUIToEllesmereDB.disableSelf == true)
+menu._migrate:GetScript("OnClick")(menu._migrate)
+assert(disabledAddons.ElvUI == true)
+assert(disabledAddons.ElvUI_to_EllesmeresUI == true)
+assert(__reloaded == true)
 
 SlashCmdList.ELVUITOELLESMERE()
 assert(menu:IsShown() == false)

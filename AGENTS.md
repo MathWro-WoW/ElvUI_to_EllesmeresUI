@@ -6,8 +6,8 @@ This repository contains a World of Warcraft: Midnight addon that migrates the a
 
 ## Layout
 
-- `Migration.lua` — source discovery, value conversion, staged execution, and profile commit.
-- `UI.lua` — migration window, component selection, progress, warnings, and reload flow.
+- `Migration.lua` — source discovery, value conversion, staged execution, profile commit, and selected account-wide tooltip settings.
+- `UI.lua` — migration window, component selection, progress, warnings, optional addon disabling, and reload flow.
 - `Core.lua` — addon lifecycle, automatic prompt, slash commands, and AddOn Compartment entry point.
 - `ElvUI_to_EllesmeresUI.toc` — metadata, dependencies, saved variables, and load order.
 - `tests/` — Lua 5.1 fixture and addon-load smoke coverage.
@@ -31,8 +31,10 @@ Do not reorder these files without updating and running the load smoke test.
 - Prepare selected conversions before creating the destination profile.
 - Preserve EllesmereUI profile-table identities by syncing values in place.
 - Keep EllesmereUI's live font database aligned with the committed profile so its logout hook cannot restore stale fonts.
+- Only stage EllesmereUI account-wide settings when their component is selected; tooltip cursor placement and ID-display settings are suite-wide rather than profile-local.
 - Keep migration work staged through timers so the UI can render progress between components.
 - Lock profile and component controls while a migration is active.
+- Keep both addon-disable choices opt-in, and apply them only after migration succeeds when the user explicitly reloads.
 - Do not manipulate protected frames during combat.
 - Report lossy or unsupported mappings as user-visible warnings rather than silently discarding them.
 - Preserve Lua 5.1 compatibility: no later-language syntax or standard-library assumptions.

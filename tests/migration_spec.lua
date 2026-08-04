@@ -1,6 +1,12 @@
 local ns = {}
 assert(loadfile("Migration.lua"))("ElvUI_to_EllesmeresUI", ns)
 
+UIParent = {
+    GetWidth = function() return 1920 end,
+    GetHeight = function() return 1080 end,
+    GetEffectiveScale = function() return 1 end,
+}
+
 local function color(r, g, b, a) return { r = r, g = g, b = b, a = a or 1 } end
 local function aura(enabled, point, size, perrow)
     return {
@@ -113,6 +119,16 @@ local sourceProfile = {
             icons = { tracking = { hide = true }, calendar = { hide = false } },
         },
     },
+    tooltip = {
+        xOffset = 8,
+        yOffset = 18,
+        anchorToBags = "TOPRIGHT",
+        cursorAnchor = true,
+        cursorAnchorType = "ANCHOR_CURSOR_RIGHT",
+        cursorAnchorX = 24,
+        cursorAnchorY = -16,
+        modifierID = "CTRL",
+    },
     unitframe = {
         statusbar = "ElvUI Norm", font = "Homespun", fontSize = 12, fontOutline = "OUTLINE",
         colors = {
@@ -152,6 +168,7 @@ local sourceProfile = {
         ShiftAB = "BOTTOM,ElvUIParent,BOTTOM,0,80",
         PetAB = "RIGHT,ElvUIParent,RIGHT,-20,0",
         MinimapMover = "TOPRIGHT,ElvUIParent,TOPRIGHT,-12,-12",
+        TooltipMover = "BOTTOMRIGHT,ElvUIParent,BOTTOMRIGHT,-40,120",
     },
 }
 sourceProfile.actionbar.bar1.visibility = "[petbattle] hide; show"
@@ -271,11 +288,33 @@ assert(mm.shape == "circle" and mm.rotateMinimap == true)
 assert(mm.position.point == "TOPRIGHT")
 assert(mm.hideTrackingButton == true)
 
+assert(EllesmereUIDB.customTooltips == true)
+assert(EllesmereUIDB.tooltipAnchorCursor == true)
+assert(EllesmereUIDB.tooltipCursorPosition == "right")
+assert(EllesmereUIDB.tooltipCursorOffsetX == 24 and EllesmereUIDB.tooltipCursorOffsetY == -16)
+assert(EllesmereUIDB.showSpellID == true and EllesmereUIDB.showItemID == true)
+assert(EllesmereUIDB.showIconID == false and EllesmereUIDB.spellIDModifier == "control")
+assert(EllesmereUIDB.tooltipGrowthDirection == "up")
+assert(profile.tooltipFixedPos.centerX == 658)
+assert(profile.tooltipFixedPos.centerY == -299.5)
+
 assert(sourceProfile.unitframe.units.player.width == 260)
 local duplicate, duplicateError = ns.RunMigration("Imported Fixture", selected)
 assert(duplicate == false and duplicateError:find("already exists", 1, true))
 local empty, emptyError = ns.RunMigration("Empty Selection", {})
 assert(empty == false and emptyError:find("Select at least one", 1, true))
+
+sourceProfile.tooltip.cursorAnchor = false
+sourceProfile.tooltip.anchorToBags = "DISABLED"
+sourceProfile.tooltip.modifierID = "HIDE"
+local staticOK, staticResult = ns.RunMigration("Static Tooltip", { tooltips = true })
+assert(staticOK, staticResult)
+assert(EllesmereUIDB.tooltipAnchorCursor == false)
+assert(EllesmereUIDB.showSpellID == false and EllesmereUIDB.showItemID == false)
+assert(EllesmereUIDB.profiles["Static Tooltip"].tooltipFixedPos.centerX == 658)
+sourceProfile.tooltip.cursorAnchor = true
+sourceProfile.tooltip.anchorToBags = "TOPRIGHT"
+sourceProfile.tooltip.modifierID = "CTRL"
 
 local supportedVisibility = sourceProfile.actionbar.bar1.visibility
 sourceProfile.actionbar.bar1.visibility = "[mod:shift] show; hide"

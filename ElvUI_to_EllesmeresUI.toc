@@ -4,7 +4,7 @@
 ## Author: Migration Tool
 ## Version: 1.0.0
 ## Dependencies: EllesmereUI
-## OptionalDeps: ElvUI, EllesmereUIUnitFrames, EllesmereUIRaidFrames, EllesmereUIActionBars, EllesmereUIMinimap
+## OptionalDeps: ElvUI, EllesmereUIUnitFrames, EllesmereUIRaidFrames, EllesmereUIActionBars, EllesmereUIMinimap, EllesmereUIBlizzardSkin
 ## SavedVariables: ElvUIToEllesmereDB
 ## IconTexture: Interface\AddOns\EllesmereUI\media\eg-logo.tga
 ## AddonCompartmentFunc: ElvUIToEllesmere_Open

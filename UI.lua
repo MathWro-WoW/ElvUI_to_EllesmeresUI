@@ -134,7 +134,7 @@ end
 
 local function createFrame()
     local frame = CreateFrame("Frame", "ElvUIToEllesmereMigrationFrame", UIParent, "BackdropTemplate")
-    frame:SetSize(620, 670)
+    frame:SetSize(620, 732)
     frame:SetPoint("CENTER")
     frame:SetFrameStrata("DIALOG")
     frame:SetClampedToScreen(true)
@@ -260,7 +260,7 @@ local function createFrame()
     frame._all = all
     frame._none = none
 
-    local disable = makeCheck(frame, 31, -500, {
+    local disable = makeCheck(frame, 31, -562, {
         key = "disableElvUI",
         label = "Disable ElvUI when reloading",
         description = "Optional. Keeps the source profile intact and only disables the ElvUI addon.",
@@ -271,6 +271,18 @@ local function createFrame()
         savedDB().disableElvUI = self.checked
     end)
     frame._disableCheck = disable
+
+    local disableSelf = makeCheck(frame, 318, -562, {
+        key = "disableSelf",
+        label = "Disable this addon when reloading",
+        description = "Optional. Re-enable it from the AddOns list to run another migration.",
+    })
+    disableSelf:SetCheckedVisual(savedDB().disableSelf == true)
+    disableSelf:SetScript("OnClick", function(self)
+        self:SetCheckedVisual(not self.checked)
+        savedDB().disableSelf = self.checked
+    end)
+    frame._disableSelfCheck = disableSelf
 
     local progress = CreateFrame("StatusBar", nil, frame, "BackdropTemplate")
     progress:SetSize(564, 24)
@@ -355,6 +367,7 @@ local function createFrame()
         self._nameBox:SetAlpha(busy and 0.55 or 1)
         for _, check in ipairs(self._checks) do setCheckEnabled(check, not busy) end
         setCheckEnabled(self._disableCheck, not busy)
+        setCheckEnabled(self._disableSelfCheck, not busy)
         self._all:SetEnabled(not busy)
         self._all:SetAlpha(busy and 0.45 or 1)
         self._none:SetEnabled(not busy)
@@ -367,6 +380,9 @@ local function createFrame()
         if frame._migrationComplete then
             if savedDB().disableElvUI and C_AddOns and C_AddOns.DisableAddOn then
                 C_AddOns.DisableAddOn("ElvUI")
+            end
+            if savedDB().disableSelf and C_AddOns and C_AddOns.DisableAddOn then
+                C_AddOns.DisableAddOn(addonName)
             end
             ReloadUI()
             return
@@ -405,6 +421,7 @@ local function createFrame()
                 frame._nameBox:EnableMouse(false)
                 frame._nameBox:SetAlpha(0.55)
                 setCheckEnabled(frame._disableCheck, true)
+                setCheckEnabled(frame._disableSelfCheck, true)
 
                 local warningText = ""
                 if #result.warnings > 0 then

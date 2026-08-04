@@ -8,6 +8,7 @@ A one-time migration assistant for World of Warcraft: Midnight. It creates a new
 
 - World of Warcraft Retail / Midnight
 - EllesmereUI 8.7.3 or newer
+- EllesmereUI Blizz UI Enhanced enabled when migrating tooltip placement
 - ElvUI enabled for the login in which the migration runs
 - The corresponding EllesmereUI modules enabled for settings you want to use
 
@@ -30,11 +31,13 @@ The window can also be opened from the AddOn Compartment or with any of these sl
 1. Confirm the detected ElvUI source profile.
 2. Enter a unique name for the new EllesmereUI profile.
 3. Select the components to migrate.
-4. Choose whether ElvUI should be disabled when the UI reloads.
+4. Choose whether ElvUI, this one-time migrator, or both should be disabled when the UI reloads.
 5. Select **Create profile** and follow the visible progress indicator.
 6. Review any warnings printed in chat, then reload the UI.
 
 The migration runs in stages and reports the active component, completed steps, and percentage. Controls are locked while profile data is being prepared so the selected migration cannot change mid-run.
+
+Both addon-disable choices are unchecked by default. If **Disable this addon when reloading** is selected, the migrator disables itself immediately before the reload. It can be enabled again from the character-selection AddOns list if another profile needs to be migrated.
 
 ## Supported components
 
@@ -45,6 +48,7 @@ The migration runs in stages and reports the active component, completed steps, 
 - Raid frames and supported raid-size overrides
 - Action bars, stance bar, pet bar, micro menu, and bag bar visibility
 - Minimap
+- Tooltip fixed or cursor placement, cursor position and offsets, and spell/item ID display
 
 Where the addons expose equivalent settings, the migrator copies dimensions, positions, growth directions, visibility, sorting, textures, fonts, colors, text, cast bars, portraits, auras, and related layout options.
 
@@ -54,13 +58,14 @@ Direct action-bar visibility translations include Always, Mouseover, Never, In C
 
 ## Not migrated or only partially mapped
 
-- ElvUI modules outside the list above are not migrated. This includes nameplates, bags, chat, data texts and data bars, skins, tooltips, standalone cooldown configuration, and other general ElvUI styling.
+- ElvUI modules outside the list above are not migrated. This includes nameplates, bags, chat, data texts and data bars, standalone cooldown configuration, and other general ElvUI styling.
 - Custom unit-frame texts, tags, and complex text formats are not reproduced exactly. Only the supported text sizes, positions, and broad health-display modes are mapped.
 - Custom aura filters, priorities, blacklists, whitelists, and detailed indicator rules are not recreated. Basic buff/debuff visibility, count, size, position, and personal-debuff behavior are mapped where possible.
 - Heal-prediction, absorb, threat/glow, custom indicator, and other advanced unit-frame behaviors without a direct EllesmereUI equivalent are not copied.
 - ElvUI bars 7–9, which use action pages 7–9, are not migrated because EllesmereUI exposes no independent destination bars for those pages. Visibility expressions without a direct EllesmereUI equivalent, custom paging rules, action assignments, and keybindings are not copied; the migrator reports a warning when it must fall back from an unsupported visibility expression.
 - Minimap migration covers its basic size, shape, rotation, text scale, selected button visibility, and position. Other ElvUI minimap integrations and icon-placement rules are not copied.
 - A saved mover anchored relative to another ElvUI frame may not be convertible when its live position cannot be read. In that case, EllesmereUI keeps its existing position and the migrator reports a warning.
+- Tooltip migration enables EllesmereUI's tooltip reskin because its fixed and cursor placement controls depend on that feature. The fixed position belongs to the new profile; EllesmereUI stores cursor placement and tooltip ID settings account-wide, so selecting Tooltips updates those suite-wide settings. ElvUI's dynamic Anchor to Bags behavior has no direct equivalent and is reported as a warning when active in fixed mode.
 
 ## Safety and limitations
 

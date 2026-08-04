@@ -1,6 +1,6 @@
 local addonName, ns = ...
 
-local floor, ceil, max = math.floor, math.ceil, math.max
+local floor, ceil, max, min, abs = math.floor, math.ceil, math.max, math.min, math.abs
 local type, pairs, ipairs, tonumber, tostring = type, pairs, ipairs, tonumber, tostring
 
 ns.Components = {
@@ -12,6 +12,7 @@ ns.Components = {
     { key = "raid", label = "Raid frames", description = "Size tiers, position, groups, growth, power, text, and debuffs" },
     { key = "actionBars", label = "Action bars", description = "Bars and utility menus: layout, text, direct visibility modes, and position" },
     { key = "minimap", label = "Minimap", description = "Shape, size, rotation, text scale, buttons, and position" },
+    { key = "tooltips", label = "Tooltips", description = "Static or cursor placement, offsets, and spell/item IDs" },
 }
 
 local function deepCopy(value, seen)
@@ -150,6 +151,103 @@ local function moverPosition(ctx, moverName)
         addWarning(ctx, moverName .. " uses a relative ElvUI anchor that could not be converted; EllesmereUI kept its current position.")
     end
     return parsed
+end
+
+local function pointOffset(point, width, height)
+    point = tostring(point or ""):upper()
+    local x = point:find("LEFT", 1, true) and -width / 2
+        or (point:find("RIGHT", 1, true) and width / 2 or 0)
+    local y = point:find("BOTTOM", 1, true) and -height / 2
+        or (point:find("TOP", 1, true) and height / 2 or 0)
+    return x, y
+end
+
+local function oppositePoint(point)
+    point = tostring(point or ""):upper()
+    local vertical = point:find("TOP", 1, true) and "BOTTOM"
+        or (point:find("BOTTOM", 1, true) and "TOP" or "")
+    local horizontal = point:find("LEFT", 1, true) and "RIGHT"
+        or (point:find("RIGHT", 1, true) and "LEFT" or "")
+    return vertical .. horizontal
+end
+
+local function tooltipMoverGeometry(ctx)
+    local parent = _G.UIParent
+    if not parent or not parent.GetWidth or not parent.GetHeight then return nil end
+    local parentWidth, parentHeight = parent:GetWidth(), parent:GetHeight()
+    if not parentWidth or not parentHeight then return nil end
+
+    local frame = _G.TooltipMover
+    if frame and frame.GetCenter then
+        local x, y = frame:GetCenter()
+        if x and y then
+            local parentScale = parent.GetEffectiveScale and parent:GetEffectiveScale() or 1
+            local frameScale = frame.GetEffectiveScale and frame:GetEffectiveScale() or parentScale
+            local ratio = frameScale / parentScale
+            return x * ratio - parentWidth / 2, y * ratio - parentHeight / 2,
+                (frame.GetWidth and frame:GetWidth() or 130) * ratio,
+                (frame.GetHeight and frame:GetHeight() or 20) * ratio,
+                parentWidth, parentHeight
+        end
+    end
+
+    local saved = ctx.source.movers and ctx.source.movers.TooltipMover
+    local position = parseMover(saved)
+    if not position then
+        if saved then
+            addWarning(ctx, "TooltipMover uses a relative ElvUI anchor that could not be converted; EllesmereUI kept its inherited static tooltip position.")
+        end
+        return nil
+    end
+
+    local width, height = 130, 20
+    local relX, relY = pointOffset(position.relPoint, parentWidth, parentHeight)
+    local frameX, frameY = pointOffset(position.point, width, height)
+    return relX + position.x - frameX, relY + position.y - frameY,
+        width, height, parentWidth, parentHeight
+end
+
+local function tooltipQuadrant(x, y, width, height)
+    local left, right = -width / 6, width / 6
+    local bottom, top = -height / 6, height / 6
+    if x > left and x < right and y > top then return "TOP" end
+    if x < left and y > top then return "TOPLEFT" end
+    if x > right and y > top then return "TOPRIGHT" end
+    if x > left and x < right and y < bottom then return "BOTTOM" end
+    if x < left and y < bottom then return "BOTTOMLEFT" end
+    if x > right and y < bottom then return "BOTTOMRIGHT" end
+    if x < left and y > bottom and y < top then return "LEFT" end
+    if x > right and y > bottom and y < top then return "RIGHT" end
+    return "CENTER"
+end
+
+local function tooltipStaticPosition(ctx, src)
+    local x, y, width, height, parentWidth, parentHeight = tooltipMoverGeometry(ctx)
+    if not x then
+        addWarning(ctx, "ElvUI's static tooltip position was unavailable; EllesmereUI kept the inherited position.")
+        return nil
+    end
+
+    local point = tooltipQuadrant(x, y, parentWidth, parentHeight)
+    if point == "LEFT" then point = "BOTTOMLEFT"
+    elseif point == "RIGHT" or point == "CENTER" then point = "BOTTOMRIGHT" end
+
+    local anchorX, anchorY = pointOffset(oppositePoint(point), width, height)
+    anchorX = x + anchorX + (tonumber(src.xOffset) or 0)
+    anchorY = y + anchorY + (tonumber(src.yOffset) or 0)
+
+    local targetHalfWidth, targetHalfHeight = 140, 82.5
+    local leftSide = anchorX < 0
+    local centerX = anchorX + (leftSide and targetHalfWidth or -targetHalfWidth)
+    if leftSide and centerX >= 0 then centerX = -0.001
+    elseif not leftSide and centerX < 0 then centerX = 0 end
+    local growsDown = point:find("TOP", 1, true) ~= nil
+    local centerY = anchorY + (growsDown and -targetHalfHeight or targetHalfHeight)
+
+    if abs(anchorX) < targetHalfWidth then
+        addWarning(ctx, "ElvUI's centered tooltip anchor cannot be represented exactly by EllesmereUI's corner-based fixed anchor; the nearest static position was used.")
+    end
+    return { centerX = centerX, centerY = centerY }, growsDown and "down" or "up"
 end
 
 local function targetModule(work, folder)
@@ -805,6 +903,66 @@ local function migrateMinimap(ctx)
     set(ctx, dst, "position", moverPosition(ctx, "MinimapMover"))
 end
 
+local function migrateTooltips(ctx)
+    local src = ctx.source.tooltip
+    if type(src) ~= "table" then
+        addWarning(ctx, "ElvUI tooltip settings were not available.")
+        return
+    end
+
+    local global = ctx.globalWork
+    set(ctx, global, "customTooltips", true)
+    set(ctx, global, "tooltipAnchorCursor", src.cursorAnchor == true)
+
+    local cursorPositions = {
+        ANCHOR_CURSOR = "top",
+        ANCHOR_CURSOR_LEFT = "left",
+        ANCHOR_CURSOR_RIGHT = "right",
+    }
+    local cursorType = tostring(src.cursorAnchorType or "ANCHOR_CURSOR"):upper()
+    local cursorPosition = cursorPositions[cursorType]
+    if not cursorPosition then
+        cursorPosition = "top"
+        addWarning(ctx, "ElvUI's cursor tooltip anchor type '" .. cursorType
+            .. "' has no direct EllesmereUI equivalent; Top was used.")
+    end
+    set(ctx, global, "tooltipCursorPosition", cursorPosition)
+
+    local cursorX = tonumber(src.cursorAnchorX) or 0
+    local cursorY = tonumber(src.cursorAnchorY) or 0
+    local targetX, targetY = max(-100, min(100, cursorX)), max(-100, min(100, cursorY))
+    set(ctx, global, "tooltipCursorOffsetX", targetX)
+    set(ctx, global, "tooltipCursorOffsetY", targetY)
+    if targetX ~= cursorX or targetY ~= cursorY then
+        addWarning(ctx, "ElvUI's tooltip cursor offsets exceeded EllesmereUI's ±100 range and were clamped.")
+    end
+
+    local fixedPosition, growth = tooltipStaticPosition(ctx, src)
+    if fixedPosition then set(ctx, ctx.work, "tooltipFixedPos", fixedPosition) end
+    if growth then set(ctx, global, "tooltipGrowthDirection", growth) end
+    if not src.cursorAnchor and src.anchorToBags and src.anchorToBags ~= "DISABLED" then
+        addWarning(ctx, "ElvUI's dynamic Anchor to Bags behavior has no EllesmereUI equivalent; the fixed placement was migrated.")
+    end
+
+    local modifiers = {
+        SHOW = "none",
+        SHIFT = "shift",
+        CTRL = "control",
+        ALT = "alt",
+    }
+    local sourceModifier = tostring(src.modifierID or "HIDE"):upper()
+    local targetModifier = modifiers[sourceModifier]
+    local showIDs = targetModifier ~= nil
+    if sourceModifier ~= "HIDE" and not targetModifier then
+        addWarning(ctx, "ElvUI's tooltip ID modifier '" .. sourceModifier
+            .. "' has no direct EllesmereUI equivalent; spell and item IDs were disabled.")
+    end
+    set(ctx, global, "showSpellID", showIDs)
+    set(ctx, global, "showItemID", showIDs)
+    set(ctx, global, "showIconID", false)
+    set(ctx, global, "spellIDModifier", targetModifier or "none")
+end
+
 local MIGRATORS = {
     appearance = migrateAppearance,
     player = migratePlayer,
@@ -814,6 +972,7 @@ local MIGRATORS = {
     raid = migrateRaid,
     actionBars = migrateActionBars,
     minimap = migrateMinimap,
+    tooltips = migrateTooltips,
 }
 
 local function validateProfileName(name)
@@ -858,6 +1017,7 @@ local function beginMigration(profileName, selected)
             source = source.profile,
             sourceName = source.name,
             work = deepCopy(current),
+            globalWork = {},
             copied = 0,
             warnings = {},
             warningSet = {},
@@ -882,6 +1042,9 @@ local function commitMigration(state)
 
     local commitOk, commitError = pcall(function()
         syncTable(created, state.ctx.work)
+        for key, value in pairs(state.ctx.globalWork) do
+            profilesDB[key] = deepCopy(value)
+        end
         -- SaveCurrentAsProfile switches to the new profile before we apply the
         -- converted font snapshot. Keep EllesmereUI's live font table aligned,
         -- otherwise its logout hook would copy the old font back over this one.
